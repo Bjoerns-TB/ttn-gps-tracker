@@ -6,3 +6,6 @@ I use sample Code from Pieter Hensen https://github.com/Teumaat/ttn-tracker
 The folder ttn contais the payload decoder for TTN.
 
 The folder node-red contains a sample flow adding a geohash and storing data in InfluxDB.
+
+Changes:
+- Added versions for OTAA and LowPower
