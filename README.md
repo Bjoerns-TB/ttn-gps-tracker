@@ -9,3 +9,4 @@ The folder node-red contains a sample flow adding a geohash and storing data in 
 
 Changes:
 - Added versions for OTAA and LowPower
+- Enable SBAS 
