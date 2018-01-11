@@ -167,6 +167,11 @@ void setup()
   Serial.println(F("Starting"));
 
   Serial1.begin(9600);
+  
+  delay(5000);
+  Serial1.print("$PMTK313,1*2E\r\n");  // Enable to search a SBAS satellite
+  Serial1.print("$PMTK301,2*2E\r\n");  // Select SBAS as DGPS source (RTCM)
+  Serial1.print("$PMTK513,1*28\r\n");
 
   // LMIC init
   os_init();
