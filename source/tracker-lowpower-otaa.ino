@@ -55,7 +55,7 @@ void get_coords () {
   bool newData = false;
   unsigned long chars;
   unsigned short sentences, failed;
-  float flat, flon;
+  float flat, flon, faltitudeGPS, fhdopGPS;
   unsigned long age;
 
   // For one second we parse GPS data and report some key values
@@ -71,6 +71,8 @@ void get_coords () {
 
   if ( newData ) {
     gps.f_get_position(&flat, &flon, &age);
+    faltitudeGPS = gps.f_altitude();
+    fhdopGPS = gps.hdop();
     flat = (flat == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flat;
     flon = (flon == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flon;
   }
@@ -79,6 +81,8 @@ void get_coords () {
 
   int32_t lat = flat * 10000;
   int32_t lon = flon * 10000;
+  int16_t altitudeGPS = faltitudeGPS * 100;
+  int8_t hdopGPS = fhdopGPS; 
 
   // Pad 2 int32_t to 6 8uint_t, big endian (24 bit each, having 11 meter precision)
   coords[0] = lat;
@@ -88,6 +92,11 @@ void get_coords () {
   coords[3] = lon;
   coords[4] = lon >> 8;
   coords[5] = lon >> 16;
+  
+  coords[6] = altitudeGPS;
+  coords[7] = altitudeGPS >> 8;
+
+  coords[8] = hdopGPS;
 }
 
 void do_send(osjob_t* j) {
