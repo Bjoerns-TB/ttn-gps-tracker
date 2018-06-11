@@ -10,3 +10,4 @@ The folder node-red contains a sample flow adding a geohash and storing data in 
 Changes:
 - Added versions for OTAA and LowPower
 - Enable SBAS 
+- Added support for TTN Mapper integration from within TTN console (HDOP, Altitude, Payload Decoder with correct syntax)
