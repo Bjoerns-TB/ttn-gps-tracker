@@ -1,25 +1,22 @@
-//This is the first commit of an Arduino Sketch for an GPS-Tracker to work with The Things Network.
-//This Sketch uses TinyGPS, the Arduino LMIC-Library by Matthijs Kooijmanand and the hartware serial of an Adafruit Feater LoRa.
-//I use sample Code from Pieter Hensen https://github.com/Teumaat/ttn-tracker
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-#include <TinyGPS.h>
+#include <TinyGPS++.h>
 
 // use low power sleep; comment next line to not use low power sleep
 #define SLEEP
 
 #ifdef SLEEP
-  #include "LowPower.h"
-  bool next = false;
+#include "LowPower.h"
+bool next = false;
 #endif
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 56; //multiple of 8
+const unsigned TX_INTERVAL = 32; //multiple of 8
 
-TinyGPS gps;
-//SoftwareSerial ss(2,3);
+TinyGPSPlus gps;
+
 
 // This EUI must be in little-endian format, so least-significant-byte
 // first. When copying an EUI from ttnctl output, this means to reverse
@@ -40,7 +37,10 @@ static const u1_t PROGMEM APPKEY[16] = { 0x6C, 0x10, 0x63, 0x2D, 0xD5, 0xD2, 0xF
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
 
-uint8_t coords[6];
+uint8_t coords[8];
+uint32_t LatitudeBinary, LongitudeBinary;
+uint16_t altitudeGps;
+uint8_t hdopGps;
 static osjob_t sendjob;
 
 // Pin mapping
@@ -52,51 +52,36 @@ const lmic_pinmap lmic_pins = {
 };
 
 void get_coords () {
-  bool newData = false;
-  unsigned long chars;
-  unsigned short sentences, failed;
-  float flat, flon, faltitudeGPS, fhdopGPS;
-  unsigned long age;
 
   // For one second we parse GPS data and report some key values
   for (unsigned long start = millis(); millis() - start < 1000;) {
     while (Serial1.available()) {
       char c = Serial1.read();
-      Serial.write(c); // uncomment this line if you want to see the GPS data flowing
-      if (gps.encode(c)) { // Did a new valid sentence come in?
-        newData = true;
-      }
+      //Serial.write(c); // uncomment this line if you want to see the GPS data flowing
+      gps.encode(c);
     }
   }
 
-  if ( newData ) {
-    gps.f_get_position(&flat, &flon, &age);
-    faltitudeGPS = gps.f_altitude();
-    fhdopGPS = gps.hdop();
-    flat = (flat == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flat;
-    flon = (flon == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flon;
+  if (gps.location.isValid()) {
+
+    LatitudeBinary = ((gps.location.lat() + 90) / 180.0) * 16777215;
+    LongitudeBinary = ((gps.location.lng() + 180) / 360.0) * 16777215;
+
+    coords[0] = ( LatitudeBinary >> 16 ) & 0xFF;
+    coords[1] = ( LatitudeBinary >> 8 ) & 0xFF;
+    coords[2] = LatitudeBinary & 0xFF;
+
+    coords[3] = ( LongitudeBinary >> 16 ) & 0xFF;
+    coords[4] = ( LongitudeBinary >> 8 ) & 0xFF;
+    coords[5] = LongitudeBinary & 0xFF;
+
+    altitudeGps = gps.altitude.meters();
+    coords[6] = ( altitudeGps >> 8 ) & 0xFF;
+    coords[7] = altitudeGps & 0xFF;
+
+    hdopGps = gps.hdop.value() / 10;
+    coords[8] = hdopGps & 0xFF;
   }
-
-  gps.stats(&chars, &sentences, &failed);
-
-  int32_t lat = flat * 10000;
-  int32_t lon = flon * 10000;
-  int16_t altitudeGPS = faltitudeGPS * 100;
-  int8_t hdopGPS = fhdopGPS; 
-
-  // Pad 2 int32_t to 6 8uint_t, big endian (24 bit each, having 11 meter precision)
-  coords[0] = lat;
-  coords[1] = lat >> 8;
-  coords[2] = lat >> 16;
-
-  coords[3] = lon;
-  coords[4] = lon >> 8;
-  coords[5] = lon >> 16;
-  
-  coords[6] = altitudeGPS;
-  coords[7] = altitudeGPS >> 8;
-
-  coords[8] = hdopGPS;
 }
 
 void do_send(osjob_t* j) {
@@ -115,7 +100,7 @@ void do_send(osjob_t* j) {
 void onEvent (ev_t ev) {
   Serial.print(os_getTime());
   Serial.print(": ");
-  switch(ev) {
+  switch (ev) {
     case EV_SCAN_TIMEOUT:
       Serial.println(F("EV_SCAN_TIMEOUT"));
       break;
@@ -138,16 +123,13 @@ void onEvent (ev_t ev) {
       // during join, but not supported by TTN at this time).
       LMIC_setLinkCheckMode(0);
       break;
-    case EV_RFU1:
-      Serial.println(F("EV_RFU1"));
-      break;
     case EV_JOIN_FAILED:
       Serial.println(F("EV_JOIN_FAILED"));
       break;
     case EV_REJOIN_FAILED:
       Serial.println(F("EV_REJOIN_FAILED"));
       break;
-      break;
+
     case EV_TXCOMPLETE:
       Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
       if (LMIC.txrxFlags & TXRX_ACK)
@@ -159,6 +141,7 @@ void onEvent (ev_t ev) {
       }
       // Schedule next transmission
       next = true;
+      break;
     case EV_LOST_TSYNC:
       Serial.println(F("EV_LOST_TSYNC"));
       break;
@@ -175,6 +158,9 @@ void onEvent (ev_t ev) {
     case EV_LINK_ALIVE:
       Serial.println(F("EV_LINK_ALIVE"));
       break;
+    case EV_TXSTART:
+      Serial.println(F("EV_TXSTART"));
+      break;
     default:
       Serial.println(F("Unknown event"));
       break;
@@ -187,11 +173,10 @@ void setup()
   Serial.println(F("Starting"));
 
   Serial1.begin(9600);
-  
   delay(5000);
-  Serial1.print("$PMTK313,1*2E\r\n");  // Enable to search a SBAS satellite
   Serial1.print("$PMTK301,2*2E\r\n");  // Select SBAS as DGPS source (RTCM)
-  Serial1.print("$PMTK513,1*28\r\n");
+  Serial1.print("$PMTK313,1*2E\r\n");  // Enable to search a SBAS satellite
+  //Serial1.print("$PMTK513,1*28\r\n");
 
   // LMIC init
   os_init();
@@ -199,17 +184,17 @@ void setup()
   // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
 
-    LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
+  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
-    // Start job
-    do_send(&sendjob);
+  // Start job
+  do_send(&sendjob);
 }
 
 void loop() {
 #ifndef SLEEP
 
   os_runloop_once();
-  
+
 #else
   extern volatile unsigned long timer0_overflow_count;
 
@@ -221,21 +206,20 @@ void loop() {
 
     int sleepcycles = TX_INTERVAL / 8;  // calculate the number of sleepcycles (8s) given the TX_INTERVAL
     Serial.flush(); // give the serial print chance to complete
-    for (int i=0; i<sleepcycles; i++) {
+    for (int i = 0; i < sleepcycles; i++) {
       // Enter power down state for 8 s with ADC and BOD module disabled
       LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
 
       // LMIC uses micros() to keep track of the duty cycle, so
       // hack timer0_overflow for a rude adjustment:
       cli();
-      timer0_overflow_count+= 8 * 64 * clockCyclesPerMicrosecond();
+      timer0_overflow_count += 8 * 64 * clockCyclesPerMicrosecond();
       sei();
     }
-
     next = false;
     // Start job
     do_send(&sendjob);
   }
-  
+
 #endif
 }
