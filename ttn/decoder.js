@@ -1,16 +1,24 @@
-function Decoder(b, port) {
+function Decoder(bytes, port) {
+    var decoded = {};
 
-  var lat = (b[0] | b[1]<<8 | b[2]<<16 | (b[2] & 0x80 ? 0xFF<<24 : 0)) / 10000;
-  var lon = (b[3] | b[4]<<8 | b[5]<<16 | (b[5] & 0x80 ? 0xFF<<24 : 0)) / 10000;
-  var alt = (b[6] | b[7]<<8 | (b[7] & 0x80 ? 0xFF<<16 : 0)) / 100;
-  var hdop = b[8] / 100;
+    decoded.latitude = ((bytes[0]<<16)>>>0) + ((bytes[1]<<8)>>>0) + bytes[2];
+    decoded.latitude = (decoded.latitude / 16777215.0 * 180) - 90;
+  
+    decoded.longitude = ((bytes[3]<<16)>>>0) + ((bytes[4]<<8)>>>0) + bytes[5];
+    decoded.longitude = (decoded.longitude / 16777215.0 * 360) - 180;
+  
+    var altValue = ((bytes[6]<<8)>>>0) + bytes[7];
+    var sign = bytes[6] & (1 << 7);
+    if(sign)
+    {
+        decoded.altitude = 0xFFFF0000 | altValue;
+    }
+    else
+    {
+        decoded.altitude = altValue;
+    }
+  
+    decoded.hdop = bytes[8] / 10.0;
 
-  return {
-    
-      latitude: lat,
-      longitude: lon,
-      altitude: alt,
-      hdop: hdop
-    
-  };
+    return decoded;
 }
