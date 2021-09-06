@@ -12,6 +12,11 @@ The hardware used is an Afafruit Feather 32u4 Lora with the Ultimate GPS feather
   #define DISABLE_BEACONS
 ```
 
+For the non OTAA version it is also possible to disable JOIN and free up more memory
+```
+  #define DISABLE_JOIN
+```
+
 The folder ttn contais the payload decoder for TTN.
 
 The folder node-red contains a sample flow adding a geohash and storing data in InfluxDB.
