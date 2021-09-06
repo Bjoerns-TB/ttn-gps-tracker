@@ -16,8 +16,9 @@ For the non OTAA version it is also possible to disable JOIN and free up more me
 ```
   #define DISABLE_JOIN
 ```
+Please keep in mind that you have to delete/uncomment these settings for other projects.
 
-The folder ttn contais the payload decoder for TTN.
+The folder ttn contais the payload decoder for TTN (V2) and TTS (V3).
 
 The folder node-red contains a sample flow adding a geohash and storing data in InfluxDB.
 
