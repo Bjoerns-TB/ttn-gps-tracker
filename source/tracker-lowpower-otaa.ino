@@ -42,7 +42,7 @@ static const u1_t PROGMEM APPKEY[16] = { 0x6C, 0x10, 0x63, 0x2D, 0xD5, 0xD2, 0xF
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
 
-uint8_t coords[8];
+uint8_t coords[9];
 uint32_t LatitudeBinary, LongitudeBinary;
 uint16_t altitudeGps;
 uint8_t hdopGps;
